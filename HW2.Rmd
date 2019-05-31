@@ -1,0 +1,132 @@
+---
+title: 'HW #2'
+author: "Matthew Fein"
+date: "February 27, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Homework #2
+
+1)
+a.  A wine's vintage is the year in which the grapes used were grown and harvested. 
+b.  The response variable used in this paper is the log price of the vintage relative to 1961.
+
+
+```{r wine}
+require(leaps)
+require(DAAG)
+require(tidyverse)
+require(gridExtra)
+require(GGally) 
+###USE READ_CSV from TIDYVERSE
+theme.info <- theme(plot.title = element_text(size=16, hjust=0.5),
+                    axis.title = element_text(size=14),
+                    axis.text = element_text(size=14))#theme for plots
+wine <- read.csv("wine.dat", header = TRUE)                                   #import data
+wine$LPRICE2 <- as.integer(wine$LPRICE2)
+wine$DEGREES <- as.integer((wine$DEGREES))
+
+```
+c. The prices for 1954 and 1956 are missing because these vintages are so poor that they are no longer traded.
+
+d,
+```{r}
+wine[1:28,-1 ] %>% ggpairs(aes(color=), columns=c(1:5), cardinality_threshold = 36) +
+          theme.info
+```
+It looks like the rain in the months preceding growing season and the temperature during growing season are highly correlated, far more than any other combination.
+
+e.
+```{r regs}
+lm.1 <- lm(LPRICE2 ~ TIME_SV, data=wine)
+summary(lm.1)
+
+lm.2 <- lm(LPRICE2 ~ TIME_SV + DEGREES + HRAIN + WRAIN, data=wine)
+summary(lm.2)
+```
+
+Looking at the R-squared values of each model it seems that the second model looking at multiple independent variables is the better of the two models.  This is the same conclusion the authors reached as well.
+f. Both models have n=37.
+g.LPRICE2 = 22.48 -.46(TIME_SV) -.23(DEGREES)+.03(HRAIN)+.002(WRAIN)+e
+The y-intercept represents the log price of wine ignoring all factors except error so I say it is not usable.
+h.
+```{r}
+prediction.1 <- predict(lm.1)
+prediction.4 <- predict(lm.2)
+
+#SSE
+SSE <- c(sum(lm.1$resid^2), sum(lm.2$resid^2))
+#RMSE
+RMSE <- c(sqrt(sum((prediction.1-wine$LPRICE2)^2)/(nrow(wine) - 1- 1)), sqrt(sum((prediction.4-wine$LPRICE2)^2)/(nrow(wine) - 4- 1)))
+#PRESS stat
+PRESS <- c(press(lm.1), press(lm.2))
+# computing RMSE jackknife
+RMSEj <- c(sqrt(press(lm.1)/(nrow(wine)-1-1)), sqrt(press(lm.2)/(nrow(wine)-4-1)))
+
+tab <- rbind(SSE,RMSE,PRESS,RMSEj)
+colnames(tab) <- c("lm.1", "lm.2")
+show(tab)
+
+```
+I would not change my previous decision, the model with more predictors has a lower RMSE.
+1. If we were able to come up with all of the data for the relevant time up through 2005 in theory we could use this model.  This assumes that nothing about the wine making process has changed, too.
+
+
+2)a.  The Pineo-Porter scale is a measure of an occupation's "prestige" or more simply how an occupation rank's in terms of benefits to oneself and society.  It is primarily computed by measures of different socioeconomic statistics and location information (Goyder & Frank, 2007).  This method began to come under criticism in the late 20th/early21st centuries in favor of newer measures which incorporate some information regarding the level of certain skills required.  Considering what the newer scales take into account I do not think the Pineo-Porter rating is useful.
+
+b.
+```{r}
+prestige <- read.csv("prestige.dat", header = TRUE)   #imiport data
+
+#make scattermatrix (NOTE: colors are different professions rather than shapes)
+prestige %>% ggpairs(aes(color=type), columns=c(2:6), cardinality_threshold = 36) +
+          theme.info
+
+
+
+
+```
+c.
+```{r}
+missing <- is.na(prestige$type)
+show(missing)
+```
+
+Athletes, newsboys, babysitters and farmers do not have types.  Since these professions vary widely in terms of income and are proobably less frequently seen they should be removed from the analysis.  I don't think they represent a meaningful sample of a particular population.
+```{r}
+missing <- prestige[is.na(prestige$type), ]
+show(missing)
+
+
+```
+d. There seems to be a strong interaction between type and education and a moderate to weak interaction between type and income.
+
+e.
+```{r}
+pres.cleaned <- prestige[!is.na(prestige$type), ]
+
+lm.pres <- lm(prestige~ income + education + type +income*type + education*type, data = pres.cleaned)
+summary(lm.pres)
+```
+Income alone and the income x type "prof" are the most significant predictors of prestige, while incomextype"wc" and education x "typewc" are significant, too.
+
+f.
+```{r}
+hist(pres.cleaned$income)
+hist(log(pres.cleaned$income))
+     
+```
+The income alone histogram is positively skewed while the log income resembles a normal distribution.
+
+g.
+```{r}
+lm.pres2 <- lm(prestige~ log(income) + education + type +log(income)*type + education*type, data = pres.cleaned)
+summary(lm.pres2)
+```
+Simply put there are a couple more significant IV's using the log income.
+
+h. The model quality (R^2) decreases slightly when log income is used. A partial F test would not be appropriate because we have not changed the number of predictor variables, rather we are measuring some on a log scale.
